@@ -89,31 +89,26 @@
 
     // ——— Decoded callback ———
     function onDecoded(systemNumber, studentId) {
-      // DEBUG 1: show it fired
-      alert(`Decoded: ${studentId}\nPosting to: ${API_URL}`);
-
-      // stop scanner
+      alert(`Posting to Apps Script:\n${API_URL}\nStudent ID: ${studentId}`);
       scanner.stop().then(() => scanner.clear());
-
-      // POST to your Apps Script
+    
       fetch(API_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ systemNumber, studentId })
       })
-      .then(res => {
-        alert('Response status: ' + res.status);
-        return res.json();
+      .then(r => {
+        alert('Response status: ' + r.status);
+        return r.json();
       })
       .then(json => {
         alert('Response JSON:\n' + JSON.stringify(json, null, 2));
-        // you can also: msgDiv.innerHTML = `…`
       })
       .catch(err => {
         alert('Fetch error: ' + err.message);
         console.error(err);
       });
     }
+
 
     // ——— Close button ———
     closeBtn.onclick = () => {
