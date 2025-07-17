@@ -1,122 +1,139 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Lab Mouse Check‑In/Out</title>
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
   <style>
     body { font-family: Arial, sans-serif; text-align: center; margin: 10px; }
-    #system-table td { border: 1px solid #ccc; padding: 15px; cursor: pointer; }
-    #overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); }
-    #popup { display: none; position: fixed; top: 15%; left: 50%; transform: translateX(-50%);
-      background: #fff; padding: 20px; box-shadow: 0 0 10px #333; }
-    #message { margin-top: 15px; font-size: 1.2em; }
+    table { border-collapse: collapse; margin: 20px auto; }
+    td {
+      border: 1px solid #ccc; padding: 15px; width: 60px; height: 60px;
+      cursor: pointer; user-select: none; font-weight: bold;
+      transition: background-color .2s;
+    }
+    td:hover { background-color: #e0f7ff; }
+    #overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.5); z-index: 1000;
+    }
+    #popup {
+      display: none; position: fixed; top: 15%; left: 50%;
+      transform: translateX(-50%);
+      background: #fff; padding: 20px; box-shadow: 0 0 10px #333;
+      z-index: 1001;
+    }
+    #message { margin-top: 15px; font-size: 1.1em; }
+    #test-fetch {
+      position: fixed; bottom: 10px; right: 10px;
+      padding: 8px 12px; font-size: 14px; z-index: 1100;
+    }
   </style>
 </head>
 <body>
+
   <h2>Lab Mouse Check‑In/Out</h2>
-  <p>Click any system to scan Student ID:</p>
+  <p>Click a system number to scan Student ID:</p>
   <table id="system-table" aria-label="Systems"></table>
 
   <div id="overlay"></div>
   <div id="popup">
     <h3>System <span id="sys-num"></span></h3>
     <div id="reader" style="width:300px; height:300px; margin:auto;"></div>
-    <div id="message">Scanning...</div>
+    <div id="message">Scanning…</div>
     <button id="close-btn">Close</button>
   </div>
 
-  <script>
-    // Google Apps Script Web App URL (deployed to "Anyone")
-    const API_URL = 'https://httpbin.org/post';
+  <!-- Test‑Fetch Button -->
+  <button id="test-fetch">Test Fetch</button>
 
-    // Build 60 systems
+  <script>
+    // ——— CONFIG ———
+    const API_URL = 'https://script.google.com/macros/s/AKfycby5shdVbj4YvoIsOmo2KUMOIZtPpmuzZhNMmJE7fiMjF84WvHM9FWm82gvDDKd34-bK/exec';
+
+    // ——— Build the 60‑cell table ———
     const table = document.getElementById('system-table');
     let row;
     for (let i = 1; i <= 60; i++) {
-      if ((i - 1) % 8 === 0) {
-        row = table.insertRow();
-      }
+      if ((i - 1) % 8 === 0) row = table.insertRow();
       const cell = row.insertCell();
       cell.textContent = i;
       cell.onclick = () => startScan(i);
     }
 
-    const overlay = document.getElementById('overlay');
-    const popup   = document.getElementById('popup');
-    const sysNum  = document.getElementById('sys-num');
-    const msgDiv  = document.getElementById('message');
-    const closeBtn= document.getElementById('close-btn');
+    // ——— Overlay & Popup elements ———
+    const overlay  = document.getElementById('overlay');
+    const popup    = document.getElementById('popup');
+    const sysNum   = document.getElementById('sys-num');
+    const msgDiv   = document.getElementById('message');
+    const closeBtn = document.getElementById('close-btn');
     let scanner;
 
+    // ——— Start QR scan ———
     function startScan(system) {
       sysNum.textContent = system;
-      overlay.style.display = 'block'; popup.style.display = 'block';
-      msgDiv.textContent = 'Scanning...';
+      msgDiv.textContent = 'Scanning…';
+      overlay.style.display = 'block';
+      popup.style.display   = 'block';
 
       scanner = new Html5Qrcode('reader');
       scanner.start(
         { facingMode: 'environment' },
         { fps: 10, qrbox: 250 },
-        (decodedText) => onDecoded(system, decodedText)
+        decodedText => onDecoded(system, decodedText)
       ).catch(err => {
-        msgDiv.textContent = 'Camera error';
+        msgDiv.textContent = 'Camera init error';
       });
     }
 
+    // ——— Decoded callback ———
     function onDecoded(systemNumber, studentId) {
-  alert(`Posting to Apps Script:\n${https://script.google.com/macros/s/AKfycby5shdVbj4YvoIsOmo2KUMOIZtPpmuzZhNMmJE7fiMjF84WvHM9FWm82gvDDKd34-bK/exec}\nStudent ID: ${studentId}`);
+      // DEBUG 1: show it fired
+      alert(`Decoded: ${studentId}\nPosting to: ${API_URL}`);
 
-  // Stop the scanner
-  scanner.stop().then(() => scanner.clear());
+      // stop scanner
+      scanner.stop().then(() => scanner.clear());
 
-  // POST to your script
-  fetch(API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ systemNumber, studentId })
-  })
-  .then(res => {
-    alert('Response status: ' + res.status);
-    return res.json();
-  })
-  .then(json => {
-    alert('Response JSON:\n' + JSON.stringify(json, null, 2));
-    // You can also update msgDiv here instead of alerts
-  })
-  .catch(err => {
-    alert('Fetch error: ' + err.message);
-    console.error(err);
-  });
-}
+      // POST to your Apps Script
+      fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ systemNumber, studentId })
+      })
+      .then(res => {
+        alert('Response status: ' + res.status);
+        return res.json();
+      })
+      .then(json => {
+        alert('Response JSON:\n' + JSON.stringify(json, null, 2));
+        // you can also: msgDiv.innerHTML = `…`
+      })
+      .catch(err => {
+        alert('Fetch error: ' + err.message);
+        console.error(err);
+      });
+    }
 
-
-
+    // ——— Close button ———
     closeBtn.onclick = () => {
-      if (scanner) { scanner.stop().then(() => scanner.clear()); }
-      overlay.style.display = 'none'; popup.style.display = 'none';
+      if (scanner) scanner.stop().then(() => scanner.clear());
+      overlay.style.display = 'none';
+      popup.style.display   = 'none';
+    };
+
+    // ——— Test Fetch button ———
+    document.getElementById('test-fetch').onclick = () => {
+      alert('Testing fetch to jsonplaceholder…');
+      fetch('https://jsonplaceholder.typicode.com/posts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ foo: 'bar' })
+      })
+      .then(r => { alert('Status: ' + r.status); return r.json(); })
+      .then(j => alert('Got id=' + j.id))
+      .catch(e => alert('Fetch error: ' + e.message));
     };
   </script>
 </body>
-  <button id="test-fetch" style="position:fixed;bottom:10px;right:10px;z-index:999;">
-  Test Fetch
-</button>
-<script>
-  document.getElementById('test-fetch').onclick = () => {
-    alert('Starting test fetch to jsonplaceholder...');
-    fetch('https://jsonplaceholder.typicode.com/posts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ foo: 'bar' })
-    })
-    .then(res => {
-      alert('Status: ' + res.status);
-      return res.json();
-    })
-    .then(json => alert('Got JSON id=' + json.id))
-    .catch(err => alert('Fetch error: ' + err.message));
-  };
-</script>
-
 </html>
