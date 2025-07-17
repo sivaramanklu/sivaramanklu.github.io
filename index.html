@@ -66,29 +66,31 @@
     }
 
     function onDecoded(systemNumber, studentId) {
-  // DEBUG: show it’s firing and which URL it will post to
-  alert(`Decoded: ${studentId}\nPosting to: ${API_URL}`);
+  alert(`Posting to Apps Script:\n${https://script.google.com/macros/s/AKfycby5shdVbj4YvoIsOmo2KUMOIZtPpmuzZhNMmJE7fiMjF84WvHM9FWm82gvDDKd34-bK/exec}\nStudent ID: ${studentId}`);
 
-  // Stop scanner immediately
+  // Stop the scanner
   scanner.stop().then(() => scanner.clear());
 
-  // TEMP TEST against httpbin
-  fetch('https://httpbin.org/post', {
+  // POST to your script
+  fetch(API_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ systemNumber, studentId })
   })
-  .then(r => r.json())
+  .then(res => {
+    alert('Response status: ' + res.status);
+    return res.json();
+  })
   .then(json => {
-    alert('httpbin got it! Check console for full response.');
-    console.log(json);
-    // Then you can swap back to API_URL once this works
+    alert('Response JSON:\n' + JSON.stringify(json, null, 2));
+    // You can also update msgDiv here instead of alerts
   })
   .catch(err => {
-    alert('Fetch error in onDecoded: ' + err.message);
+    alert('Fetch error: ' + err.message);
     console.error(err);
   });
 }
+
 
 
     closeBtn.onclick = () => {
