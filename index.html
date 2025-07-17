@@ -91,4 +91,24 @@
     };
   </script>
 </body>
+  <button id="test-fetch" style="position:fixed;bottom:10px;right:10px;z-index:999;">
+  Test Fetch
+</button>
+<script>
+  document.getElementById('test-fetch').onclick = () => {
+    alert('Starting test fetch to jsonplaceholder...');
+    fetch('https://jsonplaceholder.typicode.com/posts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ foo: 'bar' })
+    })
+    .then(res => {
+      alert('Status: ' + res.status);
+      return res.json();
+    })
+    .then(json => alert('Got JSON id=' + json.id))
+    .catch(err => alert('Fetch error: ' + err.message));
+  };
+</script>
+
 </html>
