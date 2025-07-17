@@ -66,24 +66,30 @@
     }
 
     function onDecoded(systemNumber, studentId) {
-      // Stop scanner immediately
-      scanner.stop().then(() => scanner.clear());
+  // DEBUG: show it’s firing and which URL it will post to
+  alert(`Decoded: ${studentId}\nPosting to: ${API_URL}`);
 
-      // Send systemNumber & studentId
-      fetch(API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ systemNumber, studentId })
-      })
-      .then(res => res.json())
-      .then(resp => {
-        // resp should be { status: 'check-in'|'check-out', timestamp: '...', studentId: '...' }
-        msgDiv.innerHTML = `Student <b>${resp.studentId}</b><br>${resp.status.toUpperCase()} @ ${resp.timestamp}`;
-      })
-      .catch(() => {
-        msgDiv.textContent = 'Network error';
-      });
-    }
+  // Stop scanner immediately
+  scanner.stop().then(() => scanner.clear());
+
+  // TEMP TEST against httpbin
+  fetch('https://httpbin.org/post', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ systemNumber, studentId })
+  })
+  .then(r => r.json())
+  .then(json => {
+    alert('httpbin got it! Check console for full response.');
+    console.log(json);
+    // Then you can swap back to API_URL once this works
+  })
+  .catch(err => {
+    alert('Fetch error in onDecoded: ' + err.message);
+    console.error(err);
+  });
+}
+
 
     closeBtn.onclick = () => {
       if (scanner) { scanner.stop().then(() => scanner.clear()); }
