@@ -1,210 +1,94 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Lab Mouse Check-in/out</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lab Mouse Check‑In/Out</title>
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 10px;
-      text-align: center;
-    }
-    table {
-      border-collapse: collapse;
-      margin: 20px auto;
-      user-select: none;
-    }
-    td {
-      border: 1px solid #aaa;
-      padding: 15px 25px;
-      cursor: pointer;
-      text-align: center;
-      font-weight: bold;
-      width: 60px;
-      height: 60px;
-      vertical-align: middle;
-      background-color: #f0f0f0;
-      transition: background-color 0.2s;
-    }
-    td:hover {
-      background-color: #cce5ff;
-    }
-    #scanner-popup {
-      display: none;
-      position: fixed;
-      top: 10%;
-      left: 50%;
-      transform: translateX(-50%);
-      background: white;
-      border: 2px solid #333;
-      padding: 15px 25px;
-      z-index: 1000;
-      box-shadow: 0 0 15px rgba(0,0,0,0.3);
-      width: 350px;
-      max-width: 90vw;
-    }
-    #overlay {
-      display: none;
-      position: fixed;
-      top:0; left:0; right:0; bottom:0;
-      background: rgba(0,0,0,0.5);
-      z-index: 900;
-    }
-    #scanned-id {
-      font-weight: bold;
-      color: #007bff;
-    }
-    button {
-      padding: 8px 15px;
-      font-size: 16px;
-      cursor: pointer;
-      margin-top: 10px;
-    }
+    body { font-family: Arial, sans-serif; text-align: center; margin: 10px; }
+    #system-table td { border: 1px solid #ccc; padding: 15px; cursor: pointer; }
+    #overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); }
+    #popup { display: none; position: fixed; top: 15%; left: 50%; transform: translateX(-50%);
+      background: #fff; padding: 20px; box-shadow: 0 0 10px #333; }
+    #message { margin-top: 15px; font-size: 1.2em; }
   </style>
 </head>
 <body>
+  <h2>Lab Mouse Check‑In/Out</h2>
+  <p>Click any system to scan Student ID:</p>
+  <table id="system-table" aria-label="Systems"></table>
 
-<h2>Lab Mouse Check-in / Check-out System</h2>
-<p>Select system number below to scan student ID:</p>
+  <div id="overlay"></div>
+  <div id="popup">
+    <h3>System <span id="sys-num"></span></h3>
+    <div id="reader" style="width:300px; height:300px; margin:auto;"></div>
+    <div id="message">Scanning...</div>
+    <button id="close-btn">Close</button>
+  </div>
 
-<table id="system-table" aria-label="Systems Table"></table>
+  <script>
+    // Google Apps Script Web App URL (deployed to "Anyone")
+    const API_URL = 'https://script.google.com/macros/s/AKfycbxoggfdv49ygLAkO7K0PAhWWS95ckp6DWT0H7Pdqvs6iSU_-F9fLzee2bsBqxewisvS/exec';
 
-<div id="overlay" aria-hidden="true"></div>
-
-<div id="scanner-popup" role="dialog" aria-modal="true" aria-labelledby="dialog-title">
-  <h3 id="dialog-title">Scan Student ID for System <span id="current-system"></span></h3>
-  <div id="reader" style="width: 300px; margin: auto;"></div>
-  <p>Scanned Student ID: <span id="scanned-id">None</span></p>
-  <button id="cancel-btn">Cancel</button>
-</div>
-
-<script>
-  // ===== Config =====
-  const API_URL = 'https://script.google.com/macros/s/AKfycbyMk3Fvo_BHzSWnnpKTUYhWECiLMyP8GszXFylgj1P5_fNYoLUUyuwiNwRYibl9_rQs/exec'; // <<== Replace this with your Google Apps Script Web App URL
-
-  // ===== Build systems table =====
-  const table = document.getElementById('system-table');
-  let tr;
-  for(let i=1; i<=60; i++){
-    if((i-1) % 8 === 0) {
-      tr = document.createElement('tr');
-      table.appendChild(tr);
+    // Build 60 systems
+    const table = document.getElementById('system-table');
+    let row;
+    for (let i = 1; i <= 60; i++) {
+      if ((i - 1) % 8 === 0) {
+        row = table.insertRow();
+      }
+      const cell = row.insertCell();
+      cell.textContent = i;
+      cell.onclick = () => startScan(i);
     }
-    const td = document.createElement('td');
-    td.textContent = i;
-    td.dataset.system = i;
-    td.tabIndex = 0; // make focusable
-    td.addEventListener('click', () => openScanner(i));
-    td.addEventListener('keypress', e => {
-      if(e.key === 'Enter' || e.key === ' ') openScanner(i);
-    });
-    tr.appendChild(td);
-  }
 
-  // ===== Elements =====
-  const overlay = document.getElementById('overlay');
-  const popup = document.getElementById('scanner-popup');
-  const currentSystemSpan = document.getElementById('current-system');
-  const scannedIdSpan = document.getElementById('scanned-id');
-  const cancelBtn = document.getElementById('cancel-btn');
+    const overlay = document.getElementById('overlay');
+    const popup   = document.getElementById('popup');
+    const sysNum  = document.getElementById('sys-num');
+    const msgDiv  = document.getElementById('message');
+    const closeBtn= document.getElementById('close-btn');
+    let scanner;
 
-  let html5QrcodeScanner;
-  let currentSystemNumber = null;
+    function startScan(system) {
+      sysNum.textContent = system;
+      overlay.style.display = 'block'; popup.style.display = 'block';
+      msgDiv.textContent = 'Scanning...';
 
-  // ===== Open scanner popup =====
-  function openScanner(systemNumber) {
-    currentSystemNumber = systemNumber;
-    currentSystemSpan.textContent = systemNumber;
-    scannedIdSpan.textContent = 'None';
-    overlay.style.display = 'block';
-    popup.style.display = 'block';
-    overlay.setAttribute('aria-hidden', 'false');
-
-    // Start camera scanner
-    html5QrcodeScanner = new Html5Qrcode("reader");
-    html5QrcodeScanner.start(
-      { facingMode: "environment" },
-      {
-        fps: 10,
-        qrbox: 250
-      },
-      onScanSuccess,
-      onScanFailure
-    ).catch(err => {
-      alert('Camera initialization error: ' + err);
-      closeScanner();
-    });
-  }
-
-  // ===== Scan success =====
-  function onScanSuccess(decodedText, decodedResult) {
-    scannedIdSpan.textContent = decodedText;
-    // Ask user if check-in or check-out
-    let action = prompt("Enter action: 'check-in' or 'check-out'").toLowerCase();
-    if(action !== 'check-in' && action !== 'check-out') {
-      alert("Invalid action entered. Please try again.");
-      return;
-    }
-    // Send data to Google Apps Script
-    sendLog(currentSystemNumber, decodedText, action);
-    // Stop scanner and close popup
-    html5QrcodeScanner.stop().then(() => {
-      closeScanner();
-    }).catch(() => {
-      closeScanner();
-    });
-  }
-
-  // ===== Scan failure (ignored) =====
-  function onScanFailure(error) {
-    // Could log scan failures here if needed
-  }
-
-  // ===== Close scanner popup =====
-  function closeScanner() {
-    overlay.style.display = 'none';
-    popup.style.display = 'none';
-    overlay.setAttribute('aria-hidden', 'true');
-    scannedIdSpan.textContent = 'None';
-    currentSystemNumber = null;
-    if(html5QrcodeScanner) {
-      html5QrcodeScanner.clear().catch(() => {});
-      html5QrcodeScanner = null;
-    }
-  }
-
-  cancelBtn.addEventListener('click', () => {
-    if(html5QrcodeScanner) {
-      html5QrcodeScanner.stop().then(() => {
-        closeScanner();
-      }).catch(() => {
-        closeScanner();
+      scanner = new Html5Qrcode('reader');
+      scanner.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: 250 },
+        (decodedText) => onDecoded(system, decodedText)
+      ).catch(err => {
+        msgDiv.textContent = 'Camera error';
       });
-    } else {
-      closeScanner();
     }
-  });
 
-  // ===== Send log data to Google Apps Script =====
-  function sendLog(systemNumber, studentId, action) {
-    fetch(API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        systemNumber: systemNumber,
-        studentId: studentId,
-        action: action
+    function onDecoded(systemNumber, studentId) {
+      // Stop scanner immediately
+      scanner.stop().then(() => scanner.clear());
+
+      // Send systemNumber & studentId
+      fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ systemNumber, studentId })
       })
-    })
-    .then(response => response.json())
-    .then(data => {
-      alert(data.message);
-    })
-    .catch(error => {
-      alert('Error sending data: ' + error.message);
-    });
-  }
-</script>
+      .then(res => res.json())
+      .then(resp => {
+        // resp should be { status: 'check-in'|'check-out', timestamp: '...', studentId: '...' }
+        msgDiv.innerHTML = `Student <b>${resp.studentId}</b><br>${resp.status.toUpperCase()} @ ${resp.timestamp}`;
+      })
+      .catch(() => {
+        msgDiv.textContent = 'Network error';
+      });
+    }
 
+    closeBtn.onclick = () => {
+      if (scanner) { scanner.stop().then(() => scanner.clear()); }
+      overlay.style.display = 'none'; popup.style.display = 'none';
+    };
+  </script>
 </body>
 </html>
